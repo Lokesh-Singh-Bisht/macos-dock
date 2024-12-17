@@ -39,6 +39,9 @@ class _DockState extends State<Dock> {
   // Padding between vertical items.
   late double verticlItemsPadding;
 
+  // Base Y axis value of the elements.
+  late double baseTranslationY;
+
   // List of icons to display in the dock.
   List<IconData> iconsData = [
     Icons.person,
@@ -75,6 +78,7 @@ class _DockState extends State<Dock> {
     baseItemHeight = 40;
     verticlItemsPadding = 10;
     draggingIndex = null;
+    baseTranslationY = 0.0;
   }
 
   /// Calculates the size of an item based on its hover state.
@@ -82,8 +86,18 @@ class _DockState extends State<Dock> {
     return getPropertyValue(
       index: index,
       baseValue: baseItemHeight,
-      maxValue: 55,
-      nonHoveredMaxValue: 50,
+      maxValue: 50,
+      nonHoveredMaxValue: 45,
+    );
+  }
+
+  /// Calculates the elevation on T-axis of an item based on its hover state.
+  double getTranslationY(int index) {
+    return getPropertyValue(
+      index: index,
+      baseValue: baseTranslationY,
+      maxValue: -10,
+      nonHoveredMaxValue: -8,
     );
   }
 
@@ -121,102 +135,121 @@ class _DockState extends State<Dock> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          height: hoveredIndex != null
-              ? (baseItemHeight * 2)
-              : (baseItemHeight * 2) -
-                  verticlItemsPadding, // Adjusts height based on hover.
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: Colors.black12,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(
-              iconsData.length,
-              (index) {
-                return DragTarget<int>(
-                  onWillAcceptWithDetails: (data) => data.data != index,
-                  builder: (context, candidateData, rejectedData) {
-                    return LongPressDraggable<int>(
-                      delay: Durations.short4,
-                      data: index,
-                      onDragStarted: () {
-                        setState(() {
-                          draggingIndex = index; // Set the dragging index.
-                        });
-                      },
-                      onDragCompleted: () {
-                        // Reorder the items in the list after drag is completed.
-                        if (draggingIndex != null) {
-                          final dragginIndexTemp = draggingIndex!;
-                          setState(() {
-                            draggingIndex = null;
-                            isDragging = false;
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              height: (baseItemHeight * 2) - verticlItemsPadding,
+              left: 0,
+              right: 0,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                height: hoveredIndex != null
+                    ? (baseItemHeight * 2)
+                    : (baseItemHeight * 2) -
+                        verticlItemsPadding, // Adjusts height based on hover.
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.black12,
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(verticlItemsPadding),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(
+                  iconsData.length,
+                  (index) {
+                    return DragTarget<int>(
+                      onWillAcceptWithDetails: (data) => data.data != index,
+                      builder: (context, candidateData, rejectedData) {
+                        return LongPressDraggable<int>(
+                          delay: Durations.short4,
+                          data: index,
+                          onDragStarted: () {
+                            setState(() {
+                              draggingIndex = index; // Set the dragging index.
+                            });
+                          },
+                          onDragCompleted: () {
+                            // Reorder the items in the list after drag is completed.
+                            if (draggingIndex != null) {
+                              final dragginIndexTemp = draggingIndex!;
+                              setState(() {
+                                draggingIndex = null;
+                                isDragging = false;
 
-                            if (hoveredIndex != null) {
-                              int insertIndex = hoveredIndex!;
-                              if (dragginIndexTemp < insertIndex) {
-                                if (isHoveringLeftRegion) {
-                                  insertIndex--;
+                                if (hoveredIndex != null) {
+                                  int insertIndex = hoveredIndex!;
+                                  if (dragginIndexTemp < insertIndex) {
+                                    if (isHoveringLeftRegion) {
+                                      insertIndex--;
+                                    }
+                                  } else {
+                                    if (!isHoveringLeftRegion) {
+                                      insertIndex++;
+                                    }
+                                  }
+
+                                  // Reorder icon list and color list.
+                                  final draggedItem =
+                                      iconsData.removeAt(dragginIndexTemp);
+                                  iconsData.insert(insertIndex, draggedItem);
+
+                                  final draggedItemColor =
+                                      itemsColor.removeAt(dragginIndexTemp);
+                                  itemsColor.insert(
+                                      insertIndex, draggedItemColor);
                                 }
-                              } else {
-                                if (!isHoveringLeftRegion) {
-                                  insertIndex++;
-                                }
-                              }
-
-                              // Reorder icon list and color list.
-                              final draggedItem =
-                                  iconsData.removeAt(dragginIndexTemp);
-                              iconsData.insert(insertIndex, draggedItem);
-
-                              final draggedItemColor =
-                                  itemsColor.removeAt(dragginIndexTemp);
-                              itemsColor.insert(insertIndex, draggedItemColor);
+                              });
                             }
-                          });
-                        }
+                          },
+                          onDraggableCanceled: (_, __) {
+                            setState(() {
+                              draggingIndex = null;
+                            });
+                          },
+                          feedback: Material(
+                            color: Colors.transparent,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              child: buildIconContainer(
+                                  index, false, false, false),
+                            ),
+                          ),
+                          childWhenDragging: MouseRegion(
+                            hitTestBehavior: HitTestBehavior.deferToChild,
+                            cursor: SystemMouseCursors.click,
+                            onEnter: (events) {},
+                            onExit: (events) {
+                              setState(() {
+                                isDragging = true;
+                              });
+                            },
+                            child: AnimatedContainer(
+                              color: Colors.transparent,
+                              margin: EdgeInsets.symmetric(
+                                  horizontal: isDragging ? 0 : 10),
+                              duration: const Duration(milliseconds: 300),
+                              height: isDragging ? 0 : getScaledSize(index),
+                              width: isDragging ? 0 : getScaledSize(index),
+                            ),
+                          ),
+                          child: buildIconContainer(
+                              index,
+                              draggingIndex != null,
+                              isHoveringLeftRegion,
+                              index == hoveredIndex),
+                        );
                       },
-                      onDraggableCanceled: (_, __) {
-                        setState(() {
-                          draggingIndex = null;
-                        });
-                      },
-                      feedback: Material(
-                        color: Colors.transparent,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          child: buildIconContainer(index, false, false, false),
-                        ),
-                      ),
-                      childWhenDragging: MouseRegion(
-                        hitTestBehavior: HitTestBehavior.deferToChild,
-                        cursor: SystemMouseCursors.click,
-                        onEnter: (events) {},
-                        onExit: (events) {
-                          setState(() {
-                            isDragging = true;
-                          });
-                        },
-                        child: AnimatedContainer(
-                          color: Colors.transparent,
-                          margin: EdgeInsets.symmetric(
-                              horizontal: isDragging ? 0 : 10),
-                          duration: const Duration(milliseconds: 300),
-                          height: isDragging ? 0 : getScaledSize(index),
-                          width: isDragging ? 0 : getScaledSize(index),
-                        ),
-                      ),
-                      child: buildIconContainer(index, draggingIndex != null,
-                          isHoveringLeftRegion, index == hoveredIndex),
                     );
                   },
-                );
-              },
-            ).toList(),
-          ),
+                ).toList(),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -238,6 +271,7 @@ class _DockState extends State<Dock> {
         });
       },
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Increase Left Hover Region to let Dragged Item Fit in
           AnimatedContainer(
@@ -252,73 +286,84 @@ class _DockState extends State<Dock> {
                     : 0
                 : 0,
           ),
-          Stack(children: [
-            // Main icon container with dynamic size and hover effects.
-            AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                height: getScaledSize(index),
-                width: getScaledSize(index),
-                alignment: AlignmentDirectional.bottomCenter,
-                decoration: BoxDecoration(
-                  color: itemsColor[index],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                margin: const EdgeInsets.symmetric(horizontal: 10),
-                padding: const EdgeInsets.all(10),
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: Icon(
-                    iconsData[index],
-                    size: getScaledSize(index) - 20,
-                    color: Colors.white,
-                  ),
-                )),
-            // Left hover region to detect dragging to the left.
-            Positioned(
-                left: 0,
-                top: 0,
-                child: MouseRegion(
-                  hitTestBehavior: HitTestBehavior.deferToChild,
-                  cursor: SystemMouseCursors.click,
-                  onEnter: (event) {
-                    setState(() {
-                      hoveredIndex = index;
-                    });
-                    setState(() {
-                      isHoveringLeftRegion =
-                          true; // Activate left hover region.
-                    });
-                  },
-                  child: AnimatedContainer(
+          Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                // Main icon container with dynamic size and hover effects.
+                AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
-                    color: Colors.transparent,
                     height: getScaledSize(index),
-                    width: (getScaledSize(index) / 2) + 10,
-                  ),
-                )),
-            // Right hover region to detect dragging to the right.
-            Positioned(
-                left: (getScaledSize(index) / 2) + 10,
-                top: 0,
-                child: MouseRegion(
-                  hitTestBehavior: HitTestBehavior.deferToChild,
-                  cursor: SystemMouseCursors.click,
-                  onEnter: (event) {
-                    setState(() {
-                      hoveredIndex = index;
-                    });
-                    setState(() {
-                      isHoveringLeftRegion = false; // Deactivate left region.
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    color: Colors.transparent,
-                    height: getScaledSize(index),
-                    width: (getScaledSize(index) / 2) + 10,
-                  ),
-                )),
-          ]),
+                    width: getScaledSize(index),
+                    alignment: AlignmentDirectional.bottomCenter,
+                    decoration: BoxDecoration(
+                      color: itemsColor[index],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    transform: Matrix4.identity()
+                      ..translate(
+                        0.0,
+                        getTranslationY(index).roundToDouble(),
+                        0.0,
+                      ),
+                    margin: const EdgeInsets.symmetric(horizontal: 10),
+                    padding: const EdgeInsets.all(10),
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: Icon(
+                        iconsData[index],
+                        size: getScaledSize(index) - 20,
+                        color: Colors.white,
+                      ),
+                    )),
+
+                // Left hover region to detect dragging to the left.
+                Positioned(
+                    left: 0,
+                    top: 0,
+                    child: MouseRegion(
+                      hitTestBehavior: HitTestBehavior.deferToChild,
+                      cursor: SystemMouseCursors.click,
+                      onEnter: (event) {
+                        setState(() {
+                          hoveredIndex = index;
+                        });
+                        setState(() {
+                          isHoveringLeftRegion =
+                              true; // Activate left hover region.
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        color: Colors.transparent,
+                        height: getScaledSize(index),
+                        width: (getScaledSize(index) / 2) + 10,
+                      ),
+                    )),
+                // Right hover region to detect dragging to the right.
+                Positioned(
+                    left: (getScaledSize(index) / 2) + 10,
+                    top: 0,
+                    child: MouseRegion(
+                      hitTestBehavior: HitTestBehavior.deferToChild,
+                      cursor: SystemMouseCursors.click,
+                      onEnter: (event) {
+                        setState(() {
+                          hoveredIndex = index;
+                        });
+                        setState(() {
+                          isHoveringLeftRegion =
+                              false; // Deactivate left region.
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        color: Colors.transparent,
+                        height: getScaledSize(index),
+                        width: (getScaledSize(index) / 2) + 10,
+                      ),
+                    )),
+              ]),
           // Increase Right Hover Region to let Dragged Item Fit in
           AnimatedContainer(
             duration: Duration(
